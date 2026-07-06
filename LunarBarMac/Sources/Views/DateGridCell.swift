@@ -531,6 +531,7 @@ private extension DateGridCell {
     let scrollView = NSTextView.scrollableTextView()
     scrollView.frame = CGRect(x: 0, y: 0, width: 256, height: 80)
     scrollView.borderType = .bezelBorder
+    // swiftlint:disable:next force_cast
     let textView = scrollView.documentView as! NSTextView
     textView.font = .systemFont(ofSize: NSFont.systemFontSize)
     textView.string = DateMarkManager.default.mark(for: cellDate)?.note ?? ""
