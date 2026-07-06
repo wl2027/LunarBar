@@ -1,3 +1,9 @@
+excluded:
+  - build
+  - .build
+  - Pods
+  - Carthage
+
 disabled_rules:
 
   # Rationale: Arbitrary restriction
