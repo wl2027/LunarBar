@@ -14,6 +14,7 @@ import AppKit
 public class CustomButton: NSButton {
   public var hitTestInsets: CGPoint = .zero
   public var onMouseHover: ((_ isHovered: Bool) -> Void)?
+  public var onRightClick: ((_ event: NSEvent) -> Void)?
 
   private var trackingArea: NSTrackingArea?
 
@@ -81,6 +82,14 @@ public class CustomButton: NSButton {
   override public func mouseExited(with event: NSEvent) {
     super.mouseExited(with: event)
     onMouseHover?(false)
+  }
+
+  override public func rightMouseDown(with event: NSEvent) {
+    if let onRightClick {
+      onRightClick(event)
+    } else {
+      super.rightMouseDown(with: event)
+    }
   }
 
   override public func hitTest(_ point: CGPoint) -> NSView? {

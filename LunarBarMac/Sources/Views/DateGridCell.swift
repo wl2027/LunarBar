@@ -7,6 +7,7 @@
 
 import AppKit
 import AppKitControls
+import AppKitExtensions
 import EventKit
 import LunarBarKit
 
@@ -20,6 +21,7 @@ final class DateGridCell: NSCollectionViewItem {
 
   private var cellDate: Date?
   private var cellEvents = [EKCalendarItem]()
+  private var cellMark: DateMark?
   private var mainInfo = ""
 
   private var detailsTask: Task<Void, Never>?
@@ -87,6 +89,16 @@ final class DateGridCell: NSCollectionViewItem {
     let view = NSImageView(image: Constants.holidayViewImage)
     view.isHidden = true
     view.setAccessibilityHidden(true)
+
+    return view
+  }()
+
+  private let markView: NSView = {
+    let view = NSView()
+    view.wantsLayer = true
+    view.isHidden = true
+    view.setAccessibilityHidden(true)
+    view.layer?.cornerRadius = Constants.markViewSize * 0.5
 
     return view
   }()
@@ -195,6 +207,18 @@ extension DateGridCell {
       holidayView.contentTintColor = Colors.systemTeal
     }
 
+    // Update mark indicator
+    let mark = DateMarkManager.default.mark(for: cellDate)
+    self.cellMark = mark
+    if let mark {
+      markView.isHidden = false
+      markView.layerBackgroundColor = mark.color
+      markView.layer?.borderWidth = view.hairlineWidth
+      markView.layer?.borderColor = mark.color.darkerColor().cgColor
+    } else {
+      markView.isHidden = true
+    }
+
     self.mainInfo = {
       var components: [String] = []
       // E.g. [Holiday]
@@ -279,6 +303,7 @@ private extension DateGridCell {
     static let lunarFontSize: Double = FontSizes.small
     static let eventViewHeight: Double = 10
     static let focusRingBorderWidth: Double = 2
+    static let markViewSize: Double = 6
     static let holidayViewImage: NSImage = .with(symbolName: Icons.bookmarkFill, pointSize: 9)
     static let lunarDateFormatter: DateFormatter = .lunarDate
   }
@@ -351,6 +376,19 @@ private extension DateGridCell {
       holidayView.heightAnchor.constraint(equalToConstant: holidayView.frame.height),
     ])
 
+    markView.translatesAutoresizingMaskIntoConstraints = false
+    containerView.addSubview(markView)
+    NSLayoutConstraint.activate([
+      markView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 1),
+      markView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 2),
+      markView.widthAnchor.constraint(equalToConstant: Constants.markViewSize),
+      markView.heightAnchor.constraint(equalToConstant: Constants.markViewSize),
+    ])
+
+    containerView.onRightClick = { [weak self] event in
+      self?.showMarkMenu(event: event)
+    }
+
     let longPressRecognizer = NSPressGestureRecognizer(target: self, action: #selector(onLongPress(_:)))
     longPressRecognizer.minimumPressDuration = 0.5
     view.addGestureRecognizer(longPressRecognizer)
@@ -392,6 +430,7 @@ private extension DateGridCell {
       let popover = DateDetailsView.createPopover(
         title: self.mainInfo,
         events: self.cellEvents,
+        mark: self.cellMark,
         lineWidth: self.view.hairlineWidth
       )
 
@@ -410,6 +449,119 @@ private extension DateGridCell {
 
     detailsTask = Task {
       try? await showDetails()
+    }
+  }
+
+  func showMarkMenu(event: NSEvent) {
+    guard let cellDate else {
+      return
+    }
+
+    dismissDetails()
+
+    let menu = NSMenu()
+    let existingMark = DateMarkManager.default.mark(for: cellDate)
+
+    // Color options
+    for (index, preset) in DateMark.presetColors.enumerated() {
+      let item = NSMenuItem(title: preset.name)
+      item.image = .with(
+        cellColor: preset.color,
+        borderColor: preset.color.darkerColor(),
+        borderWidth: view.hairlineWidth,
+        size: CGSize(width: 12, height: 12),
+        cornerRadius: 6
+      )
+
+      if existingMark?.colorIndex == index {
+        item.setOn(true)
+      }
+
+      item.addAction { [weak self] in
+        guard let self, let cellDate = self.cellDate else { return }
+        let note = DateMarkManager.default.mark(for: cellDate)?.note
+        DateMarkManager.default.setMark(DateMark(colorIndex: index, note: note), for: cellDate)
+        self.refreshMarkView()
+      }
+
+      menu.addItem(item)
+    }
+
+    menu.addSeparator()
+
+    // Add/Edit note
+    let noteTitle = existingMark?.note != nil
+      ? Localized.DateMark.menuTitleEditNote
+      : Localized.DateMark.menuTitleAddNote
+
+    let noteItem = NSMenuItem(title: noteTitle)
+    noteItem.isEnabled = existingMark != nil
+    noteItem.addAction { [weak self] in
+      self?.showNoteAlert()
+    }
+    menu.addItem(noteItem)
+
+    // Clear mark
+    if existingMark != nil {
+      menu.addSeparator()
+      menu.addItem(withTitle: Localized.DateMark.menuTitleClearMark) { [weak self] in
+        guard let self, let cellDate = self.cellDate else { return }
+        DateMarkManager.default.removeMark(for: cellDate)
+        self.refreshMarkView()
+      }
+    }
+
+    menu.popUp(
+      positioning: nil,
+      at: containerView.convert(event.locationInWindow, from: nil),
+      in: containerView
+    )
+  }
+
+  func showNoteAlert() {
+    guard let cellDate else {
+      return
+    }
+
+    let alert = NSAlert()
+    alert.messageText = Localized.DateMark.alertMessageSetNote
+    alert.addButton(withTitle: Localized.DateMark.alertButtonTitleSave)
+    alert.addButton(withTitle: Localized.General.cancel)
+
+    let inputField = EditableTextField(frame: CGRect(x: 0, y: 0, width: 256, height: 22))
+    inputField.cell?.usesSingleLineMode = true
+    inputField.cell?.lineBreakMode = .byTruncatingTail
+    inputField.stringValue = DateMarkManager.default.mark(for: cellDate)?.note ?? ""
+    alert.accessoryView = inputField
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+      inputField.window?.makeFirstResponder(inputField)
+    }
+
+    guard alert.runModal() == .alertFirstButtonReturn else {
+      return
+    }
+
+    let note = inputField.stringValue.isEmpty ? nil : inputField.stringValue
+    DateMarkManager.default.updateNote(note, for: cellDate)
+    refreshMarkView()
+  }
+
+  func refreshMarkView() {
+    guard let cellDate else {
+      return
+    }
+
+    let mark = DateMarkManager.default.mark(for: cellDate)
+    self.cellMark = mark
+
+    if let mark {
+      markView.isHidden = false
+      markView.layerBackgroundColor = mark.color
+      markView.layer?.borderWidth = view.hairlineWidth
+      markView.layer?.borderColor = mark.color.darkerColor().cgColor
+    } else {
+      markView.isHidden = true
     }
   }
 

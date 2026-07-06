@@ -17,6 +17,7 @@ import LunarBarKit
 struct DateDetailsView: View {
   private let title: String
   private let events: [EKCalendarItem]
+  private let mark: DateMark?
   private let lineWidth: Double
 
   var body: some View {
@@ -26,6 +27,21 @@ struct DateDetailsView: View {
         .font(font(weight: .medium, scale: scale))
         .frame(height: Constants.rowHeight * scale)
         .padding(.horizontal, Constants.smallPadding * scale)
+
+      if let mark, let note = mark.note, !note.isEmpty {
+        Divider()
+        HStack {
+          Circle()
+            .fill(Color(mark.color))
+            .strokeBorder(Color(mark.color.darkerColor()), lineWidth: lineWidth)
+            .frame(width: Constants.dotSize * scale, height: Constants.dotSize * scale)
+          Text(note)
+            .font(font(weight: .regular, scale: scale))
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: Constants.rowHeight * scale)
+        .padding(.horizontal, Constants.smallPadding * scale)
+      }
 
       if !events.isEmpty {
         Divider()
@@ -65,7 +81,7 @@ struct DateDetailsView: View {
           .padding(.vertical, 2) // Tiny element, no need to scale
       }
     }
-    .frame(minWidth: events.isEmpty ? 0 : 200)
+    .frame(minWidth: (events.isEmpty && (mark?.note ?? "").isEmpty) ? 0 : 200)
     .padding(AppDesign.contentMargin)
   }
 
@@ -74,7 +90,7 @@ struct DateDetailsView: View {
     .system(size: max(Constants.fontSize * scale, 11.0), weight: weight)
   }
 
-  static func createPopover(title: String, events: [EKCalendarItem], lineWidth: Double) -> NSPopover {
+  static func createPopover(title: String, events: [EKCalendarItem], mark: DateMark?, lineWidth: Double) -> NSPopover {
     let popover = NSPopover()
     popover.behavior = .applicationDefined
     popover.animates = false
@@ -82,6 +98,7 @@ struct DateDetailsView: View {
     popover.contentViewController = DateDetailsHostVC(rootView: Self(
       title: title,
       events: events,
+      mark: mark,
       lineWidth: lineWidth
     ))
 

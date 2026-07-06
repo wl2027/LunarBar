@@ -184,6 +184,27 @@ enum Localized {
       "1208": String(localized: "Laba Festival", comment: "Chinese traditional festival"),
     ]
   }
+
+  enum DateMark {
+    // Colors
+    static let colorRed = String(localized: "Red", comment: "[DateMark] Color name")
+    static let colorOrange = String(localized: "Orange", comment: "[DateMark] Color name")
+    static let colorYellow = String(localized: "Yellow", comment: "[DateMark] Color name")
+    static let colorGreen = String(localized: "Green", comment: "[DateMark] Color name")
+    static let colorBlue = String(localized: "Blue", comment: "[DateMark] Color name")
+    static let colorPurple = String(localized: "Purple", comment: "[DateMark] Color name")
+    static let colorPink = String(localized: "Pink", comment: "[DateMark] Color name")
+    static let colorBrown = String(localized: "Brown", comment: "[DateMark] Color name")
+
+    // Menu
+    static let menuTitleAddNote = String(localized: "Add Note…", comment: "[DateMark] Add a text note to a marked date")
+    static let menuTitleEditNote = String(localized: "Edit Note…", comment: "[DateMark] Edit the text note on a marked date")
+    static let menuTitleClearMark = String(localized: "Clear Mark", comment: "[DateMark] Remove the mark from a date")
+
+    // Alert
+    static let alertMessageSetNote = String(localized: "Set Note", comment: "[DateMark] Alert title for setting a note")
+    static let alertButtonTitleSave = String(localized: "Save", comment: "[DateMark] Save the note")
+  }
 }
 
 // Icon set used in the app: https://developer.apple.com/sf-symbols/
