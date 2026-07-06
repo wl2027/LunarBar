@@ -98,7 +98,8 @@ final class DateGridCell: NSCollectionViewItem {
     view.wantsLayer = true
     view.isHidden = true
     view.setAccessibilityHidden(true)
-    view.layer?.cornerRadius = Constants.markViewSize * 0.5
+    view.layer?.cornerRadius = AppDesign.cellCornerRadius
+    view.layer?.cornerCurve = .continuous
 
     return view
   }()
@@ -212,9 +213,8 @@ extension DateGridCell {
     self.cellMark = mark
     if let mark {
       markView.isHidden = false
-      markView.layerBackgroundColor = mark.color
-      markView.layer?.borderWidth = view.hairlineWidth
-      markView.layer?.borderColor = mark.color.darkerColor().cgColor
+      markView.layerBackgroundColor = mark.color.withAlphaComponent(0.25)
+      markView.layer?.borderWidth = 0
     } else {
       markView.isHidden = true
     }
@@ -377,12 +377,12 @@ private extension DateGridCell {
     ])
 
     markView.translatesAutoresizingMaskIntoConstraints = false
-    containerView.addSubview(markView)
+    containerView.addSubview(markView, positioned: .below, relativeTo: focusRingView)
     NSLayoutConstraint.activate([
-      markView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 1),
-      markView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 2),
-      markView.widthAnchor.constraint(equalToConstant: Constants.markViewSize),
-      markView.heightAnchor.constraint(equalToConstant: Constants.markViewSize),
+      markView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+      markView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+      markView.topAnchor.constraint(equalTo: containerView.topAnchor),
+      markView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
     ])
 
     containerView.onRightClick = { [weak self] event in
@@ -528,22 +528,24 @@ private extension DateGridCell {
     alert.addButton(withTitle: Localized.DateMark.alertButtonTitleSave)
     alert.addButton(withTitle: Localized.General.cancel)
 
-    let inputField = EditableTextField(frame: CGRect(x: 0, y: 0, width: 256, height: 22))
-    inputField.cell?.usesSingleLineMode = true
-    inputField.cell?.lineBreakMode = .byTruncatingTail
-    inputField.stringValue = DateMarkManager.default.mark(for: cellDate)?.note ?? ""
-    alert.accessoryView = inputField
+    let scrollView = NSTextView.scrollableTextView()
+    scrollView.frame = CGRect(x: 0, y: 0, width: 256, height: 80)
+    scrollView.borderType = .bezelBorder
+    let textView = scrollView.documentView as! NSTextView
+    textView.font = .systemFont(ofSize: NSFont.systemFontSize)
+    textView.string = DateMarkManager.default.mark(for: cellDate)?.note ?? ""
+    alert.accessoryView = scrollView
 
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-      inputField.window?.makeFirstResponder(inputField)
+      alert.window.makeFirstResponder(textView)
     }
 
     guard alert.runModal() == .alertFirstButtonReturn else {
       return
     }
 
-    let note = inputField.stringValue.isEmpty ? nil : inputField.stringValue
-    DateMarkManager.default.updateNote(note, for: cellDate)
+    let note = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
+    DateMarkManager.default.updateNote(note.isEmpty ? nil : note, for: cellDate)
     refreshMarkView()
   }
 
@@ -557,9 +559,8 @@ private extension DateGridCell {
 
     if let mark {
       markView.isHidden = false
-      markView.layerBackgroundColor = mark.color
-      markView.layer?.borderWidth = view.hairlineWidth
-      markView.layer?.borderColor = mark.color.darkerColor().cgColor
+      markView.layerBackgroundColor = mark.color.withAlphaComponent(0.25)
+      markView.layer?.borderWidth = 0
     } else {
       markView.isHidden = true
     }

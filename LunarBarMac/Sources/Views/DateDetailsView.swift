@@ -30,16 +30,18 @@ struct DateDetailsView: View {
 
       if let mark, let note = mark.note, !note.isEmpty {
         Divider()
-        HStack {
+        HStack(alignment: .top) {
           Circle()
             .fill(Color(mark.color))
             .strokeBorder(Color(mark.color.darkerColor()), lineWidth: lineWidth)
             .frame(width: Constants.dotSize * scale, height: Constants.dotSize * scale)
+            .padding(.top, 4 * scale)
           Text(note)
             .font(font(weight: .regular, scale: scale))
             .frame(maxWidth: .infinity, alignment: .leading)
+            .lineLimit(nil)
         }
-        .frame(height: Constants.rowHeight * scale)
+        .padding(.vertical, 4 * scale)
         .padding(.horizontal, Constants.smallPadding * scale)
       }
 
