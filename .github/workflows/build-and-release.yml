@@ -9,6 +9,9 @@ on:
     types: [synchronize, opened, reopened, ready_for_review]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build & Package
@@ -17,7 +20,6 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       SCHEME: LunarBarMac
-      APP_NAME: LunarBar
 
     steps:
       - uses: actions/checkout@v5
@@ -51,23 +53,27 @@ jobs:
 
       - name: Package app
         run: |
-          APP_PATH=$(find build -path "*/Release/${APP_NAME}.app" -type d | head -1)
+          APP_PATH=$(find build -path "*/Release/*.app" -type d | head -1)
           if [ -z "$APP_PATH" ]; then
-            echo "::error::Cannot find ${APP_NAME}.app in build output"
+            echo "::error::Cannot find any .app in build output"
             find build -name "*.app" -type d
             exit 1
           fi
 
           echo "Found app at: $APP_PATH"
 
+          # Determine the app base name
+          APP_BASENAME=$(basename "$APP_PATH")
+          APP_NAME_NO_EXT="${APP_BASENAME%.app}"
+
           # Create a staging directory and rename to Dev variant
-          DEV_APP_NAME="${APP_NAME} Dev"
+          DEV_APP_NAME="${APP_NAME_NO_EXT} Dev"
           STAGING_DIR="staging"
           mkdir -p "$STAGING_DIR"
           cp -R "$APP_PATH" "$STAGING_DIR/${DEV_APP_NAME}.app"
 
           # Create a ZIP archive
-          ARCHIVE_NAME="${APP_NAME}-dev-$(git rev-parse --short HEAD).zip"
+          ARCHIVE_NAME="${APP_NAME_NO_EXT}-dev-$(git rev-parse --short HEAD).zip"
           cd "$STAGING_DIR"
           zip -r -y "../$ARCHIVE_NAME" "${DEV_APP_NAME}.app"
           cd ..
@@ -85,13 +91,16 @@ jobs:
           path: ${{ env.ARCHIVE_PATH }}
           retention-days: 30
 
-      # Only create a release when a version tag is pushed
-      - name: Create release
-        if: startsWith(github.ref, 'refs/tags/v')
+      # Automatically create a pre-release on every push to main
+      - name: Create Development Release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: dev-${{ github.sha }}
+          name: Dev Build (${{ github.sha }})
           files: ${{ env.ARCHIVE_PATH }}
-          generate_release_notes: true
-          draft: true
+          generate_release_notes: false
+          prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
